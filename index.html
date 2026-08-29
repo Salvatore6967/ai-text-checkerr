@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Text Checker</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            color: #222;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 850px;
+            margin: 50px auto;
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 18px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .description {
+            text-align: center;
+            color: #666;
+            margin-bottom: 25px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 280px;
+            resize: vertical;
+            padding: 18px;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            font-size: 16px;
+            line-height: 1.6;
+            outline: none;
+        }
+
+        textarea:focus {
+            border-color: #555;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 15px;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            background: #111;
+            color: white;
+            font-size: 17px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #333;
+        }
+
+        .result {
+            display: none;
+            margin-top: 25px;
+            padding: 25px;
+            border-radius: 15px;
+            background: #f5f5f5;
+        }
+
+        .percentage {
+            font-size: 48px;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .label {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .details {
+            margin-top: 20px;
+            line-height: 1.7;
+        }
+
+        .warning {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #777;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="card">
+
+        <h1>AI Text Checker</h1>
+
+        <p class="description">
+            Проверь текст на признаки машинной генерации
+        </p>
+
+        <textarea id="text"
+            placeholder="Вставь сюда свой текст..."></textarea>
+
+        <button onclick="checkText()">
+            Проверить текст
+        </button>
+
+        <div class="result" id="result">
+
+            <div class="percentage" id="percentage">
+                0%
+            </div>
+
+            <div class="label" id="label">
+                Результат
+            </div>
+
+            <div class="details" id="details">
+            </div>
+
+        </div>
+
+        <p class="warning">
+            Результат является приблизительной статистической оценкой и
+            не доказывает, что текст написан человеком или ИИ.
+        </p>
+
+    </div>
+
+</div>
+
+
+<script>
+
+function checkText() {
+
+    const text = document.getElementById("text").value.trim();
+
+    if (text.length < 100) {
+
+        alert("Вставь хотя бы 100 символов текста.");
+
+        return;
+    }
+
+
+    let score = 0;
+
+    /*
+        1. Слишком правильная структура предложений
+    */
+
+    const sentences = text
+        .split(/[.!?]+/)
+        .filter(s => s.trim().length > 0);
+
+    if (sentences.length > 2) {
+
+        const lengths = sentences.map(s => s.trim().split(/\s+/).length);
+
+        const average =
+            lengths.reduce((a,b) => a+b, 0) / lengths.length;
+
+        const variance =
+            lengths.reduce((sum, x) =>
+                sum + Math.pow(x - average, 2), 0
+            ) / lengths.length;
+
+        const deviation = Math.sqrt(variance);
+
+        if (deviation < 5) {
+            score += 20;
+        }
+
+        if (deviation < 3) {
+            score += 10;
+        }
+    }
+
+
+    /*
+        2. Частое использование определённых конструкций
+    */
+
+    const aiPhrases = [
+
+        "таким образом",
+        "следует отметить",
+        "важно отметить",
+        "в заключение",
+        "однако",
+        "более того",
+        "несомненно",
+        "безусловно",
+        "в конечном счёте",
+        "в конечном итоге",
+        "можно сказать",
+        "стоит отметить",
+        "необходимо подчеркнуть",
+        "с другой стороны",
+        "в то же время"
+
+    ];
+
+    const lowerText = text.toLowerCase();
+
+    let phraseCount = 0;
+
+    aiPhrases.forEach(phrase => {
+
+        if (lowerText.includes(phrase)) {
+            phraseCount++;
+        }
+
+    });
+
+    score += Math.min(phraseCount * 4, 25);
+
+
+    /*
+        3. Слишком длинные предложения
+    */
+
+    const longSentences = sentences.filter(sentence => {
+
+        return sentence.trim().split(/\s+/).length > 35;
+
+    });
+
+    if (longSentences.length > sentences.length * 0.4) {
+
+        score += 15;
+
+    }
+
+
+    /*
+        4. Повторяющиеся слова
+    */
+
+    const words = lowerText
+        .replace(/[^\p{L}\s]/gu, "")
+        .split(/\s+/)
+        .filter(word => word.length > 4);
+
+    const wordMap = {};
+
+    words.forEach(word => {
+
+        wordMap[word] = (wordMap[word] || 0) + 1;
+
+    });
+
+    const repeatedWords = Object.values(wordMap)
+        .filter(count => count >= 5)
+        .length;
+
+    score += Math.min(repeatedWords * 3, 15);
+
+
+    /*
+        5. Очень высокая доля длинных слов
+    */
+
+    const longWords = words.filter(word => word.length >= 9);
+
+    if (words.length > 20) {
+
+        const ratio = longWords.length / words.length;
+
+        if (ratio > 0.30) {
+            score += 10;
+        }
+
+    }
+
+
+    /*
+        Ограничиваем результат
+    */
+
+    score = Math.min(score, 99);
+
+
+    /*
+        Добавляем небольшую случайность,
+        чтобы одинаковые тексты не всегда
+        получали абсолютно одинаковый результат.
+    */
+
+    score += Math.floor(Math.random() * 5) - 2;
+
+    score = Math.max(1, Math.min(score, 99));
+
+
+    /*
+        Определяем результат
+    */
+
+    let label;
+
+    if (score < 25) {
+
+        label = "Скорее всего, написано человеком";
+
+    } else if (score < 50) {
+
+        label = "Есть некоторые признаки AI";
+
+    } else if (score < 75) {
+
+        label = "Много признаков AI";
+
+    } else {
+
+        label = "Высокая вероятность AI";
+
+    }
+
+
+    /*
+        Вывод
+    */
+
+    document.getElementById("percentage").textContent =
+        score + "%";
+
+    document.getElementById("label").textContent =
+        label;
+
+
+    document.getElementById("details").innerHTML = `
+
+        <p>
+            <b>Длина текста:</b>
+            ${text.length} символов
+        </p>
+
+        <p>
+            <b>Предложений:</b>
+            ${sentences.length}
+        </p>
+
+        <p>
+            <b>Найдено характерных конструкций:</b>
+            ${phraseCount}
+        </p>
+
+        <p>
+            <b>Повторяющихся слов:</b>
+            ${repeatedWords}
+        </p>
+
+    `;
+
+
+    document.getElementById("result").style.display =
+        "block";
+}
+
+</script>
+
+</body>
+</html>
